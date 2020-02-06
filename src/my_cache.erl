@@ -20,7 +20,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(my_cache_state, {}).
+-record(my_cache_state, {dets_id}).
 
 %%%===================================================================
 %%% API
@@ -43,9 +43,7 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   {_,TableID} = dets:open_file("cache_dets.file", []),
-%%  TODO some risk of exception present
-  io:format("~w~n", [{{dets_id, TableID}}]),
-  {ok, {TableID}}.
+  {ok, #my_cache_state{dets_id = TableID}}.
 
 %% @private
 %% @doc Handling call messages
@@ -61,15 +59,13 @@ init([]) ->
 %%insert(Key, Value, TimeValue, Unit)->
 %%  insert(Key, Value, #lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit})
 %%.
-handle_call({insert, Key, Value, TimeValue, Unit}, From, State)
-  ->{Dets_ID} = State
-  , dets:insert(Dets_ID,{Key,Value,#lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit}})
+handle_call({insert, Key, Value, TimeValue, Unit}, From, #my_cache_state{dets_id = Dets_ID} = State)
+  ->dets:insert(Dets_ID,{Key,Value,#lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit}})
   , From!{reply, ok,State}
   , {reply,ok,State}
 ;
-handle_call({insert, Key, Value, {lifetime,_InitialTime,_TimeValue,_Unit}=R}, From, State)
-  ->{Dets_ID} = State
-  , dets:insert(Dets_ID,{Key,Value,R})
+handle_call({insert, Key, Value, {lifetime,_InitialTime,_TimeValue,_Unit}=R}, From, #my_cache_state{dets_id = Dets_ID} = State)
+  ->dets:insert(Dets_ID,{Key,Value,R})
   , From!{reply, ok,State}
   , {reply,ok,State}
 ;
@@ -101,20 +97,19 @@ handle_call({insert, Key, Value}, From, State) ->
     From,
     State
   );
-handle_call({lookup}, From, State)
-  ->{Dets_ID} = State
-  , io:format("~w~n",[all_records_from(Dets_ID)])
-  , From ! {reply, ok,State}
-  , {reply, ok,State}
+handle_call({lookup}, From, #my_cache_state{dets_id = Dets_ID} = State)
+  ->io:format("~w~n",[all_records_from(Dets_ID)])
+  , From ! {reply,ok,State}
+  , {reply,ok,State}
 ;
-handle_call({lookup, Key}, From, State)
-  ->{Dets_ID} = State,
-    delete_obsolete(Dets_ID),
-    Res = {reply,ok, State, dets:lookup(Dets_ID, Key)},
+handle_call({lookup, Key},From,#my_cache_state{dets_id = Dets_ID} = State)
+  ->delete_obsolete(Dets_ID),
+    Res = {reply,ok, State,dets:lookup(Dets_ID, Key)},
     From!Res,
     Res
 ;
-handle_call(_Request, _From, State = #my_cache_state{}) ->
+handle_call(_Request, _From, State) ->
+  io:format("~w~n", [State]),
   {reply, ok, State}.
 
 %% @private
@@ -124,12 +119,12 @@ handle_call(_Request, _From, State = #my_cache_state{}) ->
   {noreply, NewState :: #my_cache_state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #my_cache_state{}}).
 
-handle_cast({clear}, State) ->
-  {Dets_ID} = State,
+handle_cast({clear}, #my_cache_state{dets_id = Dets_ID} = State) ->
   spawn(my_cache, delete_obsolete, [Dets_ID]),
   {noreply, State}
 ;
-handle_cast(_Request, State = #my_cache_state{}) ->
+handle_cast(_Request, State) ->
+  io:format("~w~n", [State]),
   {noreply, State}.
 
 %% @private
@@ -148,7 +143,8 @@ handle_info(_Info, State = #my_cache_state{}) ->
 %% with Reason. The return value is ignored.
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #my_cache_state{}) -> term()).
-terminate(_Reason, _State = #my_cache_state{}) ->
+terminate(_Reason, #my_cache_state{dets_id = Dets_ID}) ->
+  dets:close(Dets_ID),
   ok.
 
 %% @private
@@ -180,6 +176,8 @@ delete_obsolete([{_,_,{_,InitialTime, Value, _Unit}}=H|T], Dets_ID) ->
     false -> delete_obsolete(T, Dets_ID)
   end
 .
-%%my_cache:handle_call({lookup,111}, {[99,97,99,104,101,95,100,101,116,115,46,102,105,108,101]}).
-%%my_cache:handle_call({insert, 111, "Valera"},self(),{[99,97,99,104,101,95,100,101,116,115,46,102,105,108,101]}).
-%%my_cache:handle_call({lookup},self(),{[99,97,99,104,101,95,100,101,116,115,46,102,105,108,101]}).
+
+%%my_cache:handle_call({lookup,111},self(), {my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_call({insert, 111, "Valera"},self(),{my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_call({lookup},self(),{my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_cast({clear},{my_cache_state,"cache_dets.file"}).
