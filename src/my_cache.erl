@@ -27,8 +27,6 @@
 %%%===================================================================
 
 %% @doc Spawns the server and registers the local name (unique)
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -38,27 +36,12 @@ start_link() ->
 
 %% @private
 %% @doc Initializes the server
--spec(init(Args :: term()) ->
-  {ok, State :: #my_cache_state{}} | {ok, State :: #my_cache_state{}, timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore).
 init([]) ->
   {_,TableID} = dets:open_file("cache_dets.file", []),
   {ok, #my_cache_state{dets_id = TableID}}.
 
 %% @private
 %% @doc Handling call messages
-
--spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #my_cache_state{}) ->
-  {reply, Reply :: term(), NewState :: #my_cache_state{}} |
-  {reply, Reply :: term(), NewState :: #my_cache_state{}, timeout() | hibernate} |
-  {noreply, NewState :: #my_cache_state{}} |
-  {noreply, NewState :: #my_cache_state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewState :: #my_cache_state{}} |
-  {stop, Reason :: term(), NewState :: #my_cache_state{}}).
-%%insert(Key, Value, TimeValue, Unit)->
-%%  insert(Key, Value, #lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit})
-%%.
 handle_call({insert, Key, Value, TimeValue, Unit}, From, #my_cache_state{dets_id = Dets_ID} = State)
   ->dets:insert(Dets_ID,{Key,Value,#lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit}})
   , From!{reply, ok,State}
@@ -114,11 +97,6 @@ handle_call(_Request, _From, State) ->
 
 %% @private
 %% @doc Handling cast messages
--spec(handle_cast(Request :: term(), State :: #my_cache_state{}) ->
-  {noreply, NewState :: #my_cache_state{}} |
-  {noreply, NewState :: #my_cache_state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #my_cache_state{}}).
-
 handle_cast({clear}, #my_cache_state{dets_id = Dets_ID} = State) ->
   spawn(my_cache, delete_obsolete, [Dets_ID]),
   {noreply, State}
@@ -141,17 +119,12 @@ handle_info(_Info, State = #my_cache_state{}) ->
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
--spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #my_cache_state{}) -> term()).
 terminate(_Reason, #my_cache_state{dets_id = Dets_ID}) ->
   dets:close(Dets_ID),
   ok.
 
 %% @private
 %% @doc Convert process state when code is changed
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #my_cache_state{},
-    Extra :: term()) ->
-  {ok, NewState :: #my_cache_state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State = #my_cache_state{}, _Extra) ->
   {ok, State}.
 
@@ -176,8 +149,3 @@ delete_obsolete([{_,_,{_,InitialTime, Value, _Unit}}=H|T], Dets_ID) ->
     false -> delete_obsolete(T, Dets_ID)
   end
 .
-
-%%my_cache:handle_call({lookup,111},self(), {my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_call({insert, 111, "Valera"},self(),{my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_call({lookup},self(),{my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_cast({clear},{my_cache_state,"cache_dets.file"}).

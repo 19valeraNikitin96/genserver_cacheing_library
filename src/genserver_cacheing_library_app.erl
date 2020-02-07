@@ -5,8 +5,7 @@
 -export([stop/1]).
 
 start(_Type, _Args) ->
-	genserver_cacheing_library_sup:start_link(),
-	my_cache:start_link()
+	genserver_cacheing_library_sup:start_link()
 .
 
 stop(_State) ->

@@ -33,3 +33,8 @@ fourth_test()->
   {_,ok,{my_cache_state,"cache_dets.file"}, List} = my_cache:handle_call({lookup, 111}, self(), {my_cache_state,"cache_dets.file"}),
   ?assertEqual(true, length(List)==0)
 .
+
+%%my_cache:handle_call({lookup,111},self(), {my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_call({insert, 111, "Valera"},self(),{my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_call({lookup},self(),{my_cache_state,"cache_dets.file"}).
+%%my_cache:handle_cast({clear},{my_cache_state,"cache_dets.file"}).
