@@ -42,55 +42,27 @@ init([]) ->
 
 %% @private
 %% @doc Handling call messages
-handle_call({insert, Key, Value, TimeValue, Unit}, From, #my_cache_state{dets_id = Dets_ID} = State)
-  ->dets:insert(Dets_ID,{Key,Value,#lifetime{initial_time = erlang:system_time(?SEC), value = TimeValue, unit = Unit}})
-  , From!{reply, ok,State}
-  , {reply,ok,State}
-;
-handle_call({insert, Key, Value, {lifetime,_InitialTime,_TimeValue,_Unit}=R}, From, #my_cache_state{dets_id = Dets_ID} = State)
-  ->dets:insert(Dets_ID,{Key,Value,R})
-  , From!{reply, ok,State}
-  , {reply,ok,State}
-;
-handle_call({insert, Key, Value, TimeValue}, From, State) ->
-  handle_call(
-    { insert,
-      Key,
-      Value,
-      #lifetime
-      {initial_time = erlang:system_time(?SEC),
-        value = TimeValue,
-        unit = ?SEC
-      }
-    },
-    From,
-    State
-  );
-handle_call({insert, Key, Value}, From, State) ->
-  handle_call(
-    { insert,
-      Key,
-      Value,
-      #lifetime
-      {initial_time = erlang:system_time(?SEC),
-        value = 60,
-        unit = ?SEC
-      }
-    },
-    From,
-    State
-  );
-handle_call({lookup}, From, #my_cache_state{dets_id = Dets_ID} = State)
-  ->io:format("~w~n",[all_records_from(Dets_ID)])
-  , From ! {reply,ok,State}
-  , {reply,ok,State}
-;
+handle_call(
+    {insert, Key, Value, TimeValue}, From,
+    #my_cache_state{dets_id = Dets_ID} = State) ->
+  dets:insert(Dets_ID,{Key,Value,TimeValue+erlang:system_time(?SEC)}),
+  Result = {reply, ok,State},
+  From!Result,
+  Result;
+
+handle_call({insert,Key,Value,#lifetime{value = TimeValue,unit = TimeUnit}},
+            From,State) ->
+  case TimeUnit of
+       ?SEC -> handle_call({insert,Key,Value,TimeValue}, From, State);
+       ?MIN -> handle_call({insert,Key,Value,TimeValue*60}, From, State)
+  end;
+
 handle_call({lookup, Key},From,#my_cache_state{dets_id = Dets_ID} = State)
   ->delete_obsolete(Dets_ID),
-    Res = {reply,ok, State,dets:lookup(Dets_ID, Key)},
-    From!Res,
-    Res
-;
+  Res = {reply,ok, State,dets:lookup(Dets_ID, Key)},
+  From!Res,
+  Res;
+
 handle_call(_Request, _From, State) ->
   io:format("~w~n", [State]),
   {reply, ok, State}.
@@ -132,20 +104,18 @@ code_change(_OldVsn, State = #my_cache_state{}, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-all_records_from(Dets_ID)
-  ->Temp_Ets_ID = ets:new(temp_ets, [])
-  , dets:to_ets(Dets_ID, Temp_Ets_ID)
-  , Result = ets:tab2list(Temp_Ets_ID),
+all_records_from(Dets_ID) ->
+  Temp_Ets_ID = ets:new(temp_ets, []),
+  dets:to_ets(Dets_ID, Temp_Ets_ID),
+  Result = ets:tab2list(Temp_Ets_ID),
   ets:delete(Temp_Ets_ID),
-  Result
-.
+  Result.
+
 delete_obsolete(Dets_ID)->
-  delete_obsolete(all_records_from(Dets_ID), Dets_ID)
-.
+  delete_obsolete(all_records_from(Dets_ID), Dets_ID).
 delete_obsolete([], _Dets_ID)-> ok;
-delete_obsolete([{_,_,{_,InitialTime, Value, _Unit}}=H|T], Dets_ID) ->
-  case erlang:system_time(?SEC) > InitialTime+Value of
+delete_obsolete([{_,_,EndTime}=H|T], Dets_ID) ->
+  case erlang:system_time(?SEC) > EndTime of
     true -> dets:delete_object(Dets_ID, H), delete_obsolete(T, Dets_ID);
     false -> delete_obsolete(T, Dets_ID)
-  end
-.
+  end.

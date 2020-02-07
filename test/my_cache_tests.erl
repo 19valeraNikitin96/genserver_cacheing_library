@@ -14,17 +14,20 @@
 first_test()->
   my_cache:init([]),
   ?assertEqual({reply,ok,{my_cache_state,"cache_dets.file"}}, my_cache:handle_call({insert, 11,"Valerii",0}, self(), {my_cache_state,"cache_dets.file"}))
+  ,my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
 .
 
 second_test()->
   my_cache:init([]),
   ?assertEqual({reply,ok,{my_cache_state,"cache_dets.file"}}, my_cache:handle_call({insert, 111,"Valerii",0}, self(), {my_cache_state,"cache_dets.file"}))
+  ,my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
 .
 
 third_test()->
   my_cache:init([]),
   {_,ok,{my_cache_state,"cache_dets.file"}, List} = my_cache:handle_call({lookup, 111}, self(), {my_cache_state,"cache_dets.file"}),
-  ?assert(length(List) == 1)
+  ?assert(length(List) == 1),
+  my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
 .
 
 fourth_test()->

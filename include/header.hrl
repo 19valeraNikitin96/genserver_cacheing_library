@@ -15,4 +15,4 @@
 -define(MIN, 'minute').
 -define(TIME_UNITS, [?SEC, ?MIN]).
 
--record(lifetime, {initial_time,value,unit}).
+-record(lifetime, {value,unit}).
