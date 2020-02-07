@@ -8,36 +8,26 @@
 %%%-------------------------------------------------------------------
 -module(my_cache_tests).
 -author("erlang").
-
+-include("header.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 first_test()->
-  my_cache:init([]),
-  ?assertEqual({reply,ok,{my_cache_state,"cache_dets.file"}}, my_cache:handle_call({insert, 11,"Valerii",0}, self(), {my_cache_state,"cache_dets.file"}))
-  ,my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
-.
+  my_cache:start_link(),
+  ?assertEqual(ok,my_cache:insert(11,"Valerii",0)).
 
 second_test()->
-  my_cache:init([]),
-  ?assertEqual({reply,ok,{my_cache_state,"cache_dets.file"}}, my_cache:handle_call({insert, 111,"Valerii",0}, self(), {my_cache_state,"cache_dets.file"}))
-  ,my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
-.
+  my_cache:start_link(),
+  my_cache:insert(11,"Valerii",-1),
+  ?assertEqual({my_cache_state,"cache_dets.file",{ok,[]}},my_cache:lookup(11)).
 
 third_test()->
-  my_cache:init([]),
-  {_,ok,{my_cache_state,"cache_dets.file"}, List} = my_cache:handle_call({lookup, 111}, self(), {my_cache_state,"cache_dets.file"}),
-  ?assert(length(List) == 1),
-  my_cache:terminate("Some message", {my_cache_state,"cache_dets.file"})
-.
+  my_cache:start_link(),
+  my_cache:insert(11,"Valerii",-1),
+  my_cache:delete_obsolete(?STANDARD),
+  ?assertEqual({my_cache_state,"cache_dets.file",{ok,[]}},my_cache:lookup(11)).
 
 fourth_test()->
-  my_cache:init([]),
-  ?assertEqual({reply,ok,{my_cache_state,"cache_dets.file"}}, my_cache:handle_call({insert, 111,"Valerii", -1}, self(), {my_cache_state,"cache_dets.file"})),
-  {_,ok,{my_cache_state,"cache_dets.file"}, List} = my_cache:handle_call({lookup, 111}, self(), {my_cache_state,"cache_dets.file"}),
-  ?assertEqual(true, length(List)==0)
-.
-
-%%my_cache:handle_call({lookup,111},self(), {my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_call({insert, 111, "Valera"},self(),{my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_call({lookup},self(),{my_cache_state,"cache_dets.file"}).
-%%my_cache:handle_cast({clear},{my_cache_state,"cache_dets.file"}).
+  my_cache:start_link(),
+  my_cache:insert(11,"Valerii",-1),
+  my_cache:delete_obsolete(?NONSTANDARD),
+  ?assertEqual({my_cache_state,"cache_dets.file",{ok,[]}},my_cache:lookup(11)).
